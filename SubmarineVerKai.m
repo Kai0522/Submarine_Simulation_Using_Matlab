@@ -14,19 +14,25 @@ dh=0.01;                   % sampling time
 t=0;                      % initial time
 mult=6;                   % dimemsions of states 
 multearth=6;
+multtau=6;
+kt=0;                     %index of array
 x=[0;0;0;0;0;0];                  %SETTING INITIAL VALUE
 xdt=[0;0;0;0;0;0];
 eta=[0;0;0;0;0;0];
 etadt=[0;0;0;0;0;0];
-kt=0;                     %index of array
 tau=[0;0;0;0;0;0];
-
+taudt=[0;0;0;0;0;0];
     %%% Build M Matrix (Teetatbook Page 26.)
     m =35.6*10^6;  
-    Zg = 0;   
+    Zg = 0.0196;   
     Xg = 0;
     Yg=  0;
     rG=[Xg;Yg;Zg ];
+    Zb = 0;   
+    Xb = -0.611;
+    Yb=  0;
+    W=299;
+    B=308;
            
     Ixx = 3.4*10^12;
     Izz = 60*10^12;
@@ -55,6 +61,7 @@ ckq=[.5 .29289322 1.7071068 .16666666];
 ck=[.5 .29289322 1.7071068 .5];
 qq=zeros(mult,1);           % relative to mult (dimemsion must be the same with state)
 qq2=zeros(multearth,1);           % relative to mult (dimemsion must be the same with state)
+qq3=zeros(multtau,1);           % relative to mult (dimemsion must be the same with state)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%COMPUTING%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -67,15 +74,15 @@ while t<90
     Dv=D(x); % temporarily suppose
     
     %%%Define G Matrieta(Textbook Page 43)
-    G=zeros(6,1); % temporarily suppose
+    G_eta=G(eta); % temporarily suppose
     
     %%%Build J matrix
     C_etaphi=[ 1 , 0 , 0 ; 0 , cos(eta(4)) , sin(eta(4)) ; 0 , -sin(eta(4)) , cos(eta(4))];
     C_ytheta=[  cos(eta(5)) , 0 , -sin(eta(5)) ; 0 , 1 , 0 ; sin(eta(5)) , 0 , cos(eta(5))];
-    C_zpsi=[  cos(eta(6)) , sin(eta(6)) , 0 ; -sin(eta(6)) , cos(eta(5)) , 0 ; 0 , 0 , 1];
+    C_zpsi=[  cos(eta(6)) , sin(eta(6)) , 0 ; -sin(eta(6)) , cos(eta(6)) , 0 ; 0 , 0 , 1];
     J_1=C_etaphi' * C_ytheta' * C_zpsi';
 
-    J_2=[ 1 , sin(eta(4))*tan(eta(5)) , cos(eta(4))*tan(eta(5)) ;
+    J_2=[     1 , sin(eta(4))*tan(eta(5)) , cos(eta(4))*tan(eta(5)) ;
               0 ,          cos(eta(4))        ,           -sin(eta(4))      ;
               0 , sin(eta(4))/cos(eta(5)) , cos(eta(4))/cos(eta(5)) ];
     J=[J_1,zeros(3,3);zeros(3,3),J_2];
@@ -102,7 +109,7 @@ while t<90
     for i=1:4             %System model start    
         %% Body-Frame State Space Equation (Mv' + C(v)v + D(v)v + g(£b) = £n)
 
-            xdt=M\(tau-Cv*x-Dv*x-G);
+            xdt=M\(tau-Cv*x-Dv*x-G_eta);
 
         %% Rotation Principle (Body -> Earth) (Textbook Page 48)
 
@@ -110,20 +117,25 @@ while t<90
             etaddt= J*xdt+Jdot*x;
     
         %% Earth-Fietaed Frame Caculation
-            tau=[100;0;0;0;0;0];
+        
+        
+         %Control Input Actuator Time Delay 
+%             A_thr=diag([-1/3,-1/3,-1/3,-1/3,-1/3,-1/3]);
+            tau=[0;0;0;0;0;0];
+%             taudt=A_thr*(tau-taud);
         %% Apply Current Force
              v_c=[0;0;0;0;0;0]; % current velocity
              v_r=x-v_c;
              Cvr=C(M,v_r);
              Dvr=D(v_r);
-             tauc=M*xdt+Cvr*v_r+Dvr*v_r+G;
+             tauc=M*xdt+Cvr*v_r+Dvr*v_r+G_eta;
              tau=tau+tauc;
                
         for mm=1:mult
              ak=dh*xdt(mm);
              rm=(ak-cq(i)*qq(mm))*ckq(i);
              x(mm)=x(mm)+rm;
-            qq(mm)=qq(mm)+3.*rm-ck(i)*ak;   
+             qq(mm)=qq(mm)+3.*rm-ck(i)*ak;   
         end
         
         for mm=1:multearth 
@@ -132,13 +144,26 @@ while t<90
             eta(mm)=eta(mm)+rm2;
             qq2(mm)=qq2(mm)+3.*rm2-ck(i)*ak2; 
         end
+        for mm=1:multtau 
+            ak3=dh*taudt(mm);
+            rm3=(ak3-cq(i)*qq3(mm))*ckq(i);
+            tau(mm)=tau(mm)+rm3;
+            qq3(mm)=qq3(mm)+3.*rm3-ck(i)*ak3; 
+        end
      t=t+dh*ch(i);
     end
 
 kt=kt+1;
 time(kt)=t;
 ob(kt,:)=eta;
+obbody(kt,:)=x;
+obtau(kt,:)=tau;
 end
 
 %% Plot
-plot3(ob(:,1),ob(:,2),ob(:,3))
+figure(1)
+plot3(ob(:,1),-ob(:,2),-ob(:,3))
+figure(2)
+plot(time,obbody(:,6))
+figure(3)
+plot(time,obtau(:,1))

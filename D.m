@@ -1,4 +1,4 @@
-function D=Damping_Matrix(x)
+function D=Damping_Matrix(x)%% Textbook Page 43
 Xu=-9.30e-001;
 Yv=-3.55e+001;
 Ze=-3.55e+001;
